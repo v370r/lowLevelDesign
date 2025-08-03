@@ -1,3 +1,5 @@
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 enum Genre {
@@ -28,6 +30,24 @@ class Book {
     BookISBN bookISBN;
     int availableCopies;
     String rackLocation;
+    int isReservedBy = -1;
+}
+
+class BookIssue {
+    Instant issueDate;
+    Book book;
+
+    public BookIssue(Instant issueDate, Book book) {
+        this.issueDate = issueDate;
+        this.book = book;
+    }
+
+    public Instant getValidTill() {
+        if (issueDate == null)
+            return null;
+
+        return issueDate.plus(15, ChronoUnit.DAYS);
+    }
 }
 
 // NoArgsConstructor
@@ -92,7 +112,6 @@ class Librarian extends User {
     private BookManager bookManager;
 
     public Librarian(int cardNumber, String name, String email, String phone, String employeeId) {
-        // super(cardNumber, name, email, phone, UserType.LIBRARIAN);
         this.employeeId = employeeId;
         this.hireDate = new Date();
     }
@@ -112,6 +131,8 @@ class Member extends User {
     private List<Book> issuedBooks = new ArrayList<>();
     private double fineDue = 0.0;
 
+    private Inventory inventory;
+
     public Member(int cardNumber, String name, String email, String phone) {
         this.membershipDate = new Date();
         this.borrowedBooksCount = 0;
@@ -122,12 +143,28 @@ class Member extends User {
     }
 
     public void issueBook(Book book) {
-        if (canBorrowMore()) {
+        if (canBorrowMore(book)) {
             issuedBooks.add(book);
             borrowedBooksCount++;
         } else {
             throw new IllegalStateException("Cannot borrow more than 10 books.");
         }
+    }
+
+    public boolean reserveBook(Book book) {
+        boolean isBookAvailable = false;
+        for (Book eachBook : inventory.getAllBooks()) {
+
+            if (book.bookISBN == eachBook.bookISBN && eachBook.isReservedBy == -1) {
+                isBookAvailable = true;
+                eachBook.isReservedBy = this.cardNumber;
+                Book updatedBook = eachBook;
+                inventory.reduce(book);
+                inventory.addBook(updatedBook);
+                break;
+            }
+        }
+        return isBookAvailable;
     }
 
     public List<Book> getIssuedBooks() {
@@ -138,8 +175,17 @@ class Member extends User {
         issuedBooks.remove(book);
     }
 
-    public boolean canBorrowMore() {
-        return issuedBooks.size() < 10;
+    public boolean canBorrowMore(Book book) {
+        if (issuedBooks.size() >= 10) {
+            return false;
+        }
+        if (book.isReservedBy == -1) {
+            return true;
+        }
+        if (this.cardNumber != book.isReservedBy) {
+            return false;
+        }
+        return false;
     }
 
     public double getFineDue() {
@@ -186,12 +232,4 @@ class UserManager {
 
 class librarylld {
 
-}
-
-// Example usage
-class LibraryUserExample {
-    public static void main(String[] args) {
-        UserManager userManager = new UserManager();
-
-    }
 }
